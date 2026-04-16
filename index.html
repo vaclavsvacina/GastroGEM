@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GastroGEM | Generátor Menu U Mikeše</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        /* NAHRÁNÍ NOVÉHO FONTU MONTSERRAT PRO JÍDLA */
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Montserrat:wght@500;600;700&display=swap');
+        
+        :root { --font-mult: 1; }
+        
+        .font-serif { font-family: 'Playfair Display', serif; }
+        /* Třída sans teď používá ten krásně čitelný Montserrat */
+        .font-sans { font-family: 'Montserrat', sans-serif; }
+        
+        .a4-sheet { width: 210mm; height: 297mm; background: white; padding: 8mm 15mm; transition: all 0.3s ease; }
+        .section-line { border-bottom: 2px solid #1a202c; margin-bottom: 4px; margin-top: 0px; transition: border-color 0.3s ease; }
+        @media screen { .a4-sheet { transform: scale(0.8); transform-origin: top center; margin-bottom: -55mm; } }
+        
+        .export-mode { transform: none !important; margin: 0 !important; width: 210mm !important; height: 296.5mm !important; overflow: hidden !important; box-sizing: border-box !important; }
+
+        @media print {
+            @page { margin: 0; size: A4; }
+            body { background: white; margin: 0; }
+            #left-panel { display: none; }
+            #right-panel { width: 100%; padding: 0; background: white; align-items: flex-start; }
+            .a4-sheet { transform: none !important; box-shadow: none; width: 100%; height: auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; page-break-after: avoid; }
+        }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-logo { width: 70px; height: 70px; object-fit: contain; transition: all 0.3s ease; }
+        
+        .text-title-dyn { font-size: calc(3rem * var(--font-mult)); line-height: 1; }
+        .text-date-dyn { font-size: calc(1.125rem * var(--font-mult)); line-height: 1.75rem; }
+        .text-info-dyn { font-size: calc(0.875rem * var(--font-mult)); line-height: 1.25rem; }
+        .text-section-dyn { font-size: calc(1.125rem * var(--font-mult)); line-height: 1.75rem; }
+        .text-meal-dyn { font-size: calc(14px * var(--font-mult)); line-height: 1.2; }
+        .text-price-dyn { font-size: calc(15px * var(--font-mult)); line-height: 1.2; }
+        .text-alg-dyn { font-size: calc(9px * var(--font-mult)); line-height: 1; }
+        .text-footer-dyn { font-size: calc(9px * var(--font-mult)); line-height: 1; }
+        
+        .restaurant-logo-circle { border: 2px solid #1a202c; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 70px; height: 70px; transition: border-color 0.3s ease; }
+        .restaurant-logo-text-u { font-size: calc(11px * var(--font-mult)); font-weight: 700; text-transform: uppercase; color: #1a202c; margin-bottom: -2px; }
+        .restaurant-logo-text-mikese { font-size: calc(15px * var(--font-mult)); font-weight: 700; font-family: 'Playfair Display', serif; font-style: italic; color: #1a202c; }
+
+        .theme-dark { background-color: #0f172a !important; }
+        .theme-dark h1, .theme-dark h2, .theme-dark h3, .theme-dark .text-slate-900 { color: #fbbf24 !important; }
+        .theme-dark .text-slate-800, .theme-dark .text-slate-600 { color: #f8fafc !important; }
+        .theme-dark .section-line { border-bottom-color: #fbbf24 !important; }
+        .theme-dark .border-slate-300, .theme-dark .bg-slate-300 { background-color: #fbbf24 !important; border-color: #fbbf24 !important; }
+        .theme-dark .text-slate-400 { color: #94a3b8 !important; }
+        .theme-dark .preview-box { background-color: #1e293b !important; border-color: #fbbf24 !important; }
+        .theme-dark .preview-box p { color: #f8fafc !important; }
+        .theme-dark .restaurant-logo-circle { border-color: #fbbf24 !important; }
+        .theme-dark .restaurant-logo-text-u, .theme-dark .restaurant-logo-text-mikese { color: #fbbf24 !important; }
+
+        .theme-rustic { background-color: #fdfbf7 !important; }
+        .theme-rustic h1, .theme-rustic h2, .theme-rustic h3 { color: #78350f !important; }
+        .theme-rustic .text-slate-800, .theme-rustic .text-slate-600 { color: #451a03 !important; }
+        .theme-rustic .text-slate-900 { color: #b45309 !important; }
+        .theme-rustic .section-line { border-bottom-color: #78350f !important; }
+        .theme-rustic .border-slate-300, .theme-rustic .bg-slate-300 { background-color: #78350f !important; border-color: #78350f !important; }
+        .theme-rustic .preview-box { background-color: #fef3c7 !important; border-color: #d97706 !important; }
+        .theme-rustic .preview-box p { color: #78350f !important; }
+        .theme-rustic .restaurant-logo-circle { border-color: #78350f !important; }
+        .theme-rustic .restaurant-logo-text-u, .theme-rustic .restaurant-logo-text-mikese { color: #78350f !important; }
+
+        .theme-modern { background-color: #f1f5f9 !important; }
+        .theme-modern h1, .theme-modern h2, .theme-modern h3, .theme-modern .text-slate-900 { color: #0f172a !important; }
+        .theme-modern .text-slate-800, .theme-modern .text-slate-600 { color: #334155 !important; }
+        .theme-modern .section-line { border-bottom-color: #0d9488 !important; }
+        .theme-modern .border-slate-300, .theme-modern .bg-slate-300 { background-color: #0d9488 !important; border-color: #0d9488 !important; }
+        .theme-modern .preview-box { background-color: #e0f2f1 !important; border-color: #0d9488 !important; }
+        .theme-modern .preview-box p { color: #00695c !important; }
+        .theme-modern .restaurant-logo-circle { border-color: #0d9488 !important; }
+        .theme-modern .restaurant-logo-text-u, .theme-modern .restaurant-logo-text-mikese { color: #0d9488 !important; }
+
+        .theme-retro { background-color: #fdf2e9 !important; }
+        .theme-retro h1, .theme-retro h2, .theme-retro h3 { color: #7f1d1d !important; }
+        .theme-retro .text-slate-800, .theme-retro .text-slate-600 { color: #440b0b !important; }
+        .theme-retro .text-slate-900 { color: #991b1b !important; }
+        .theme-retro .section-line { border-bottom-color: #7f1d1d !important; }
+        .theme-retro .border-slate-300, .theme-retro .bg-slate-300 { background-color: #7f1d1d !important; border-color: #7f1d1d !important; }
+        .theme-retro .preview-box { background-color: #fee2e2 !important; border-color: #b91c1c !important; }
+        .theme-retro .preview-box p { color: #7f1d1d !important; }
+        .theme-retro .restaurant-logo-circle { border-color: #7f1d1d !important; }
+        .theme-retro .restaurant-logo-text-u, .theme-retro .restaurant-logo-text-mikese { color: #7f1d1d !important; }
+
+        .theme-industrial { background-color: #262626 !important; }
+        .theme-industrial h1, .theme-industrial h2, .theme-industrial h3 { color: #a3e635 !important; }
+        .theme-industrial .text-slate-800, .theme-industrial .text-slate-600 { color: #ffffff !important; }
+        .theme-industrial .text-slate-900 { color: #a3e635 !important; }
+        .theme-industrial .section-line { border-bottom-color: #a3e635 !important; }
+        .theme-industrial .border-slate-300, .theme-industrial .bg-slate-300 { background-color: #a3e635 !important; border-color: #a3e635 !important; }
+        .theme-industrial .text-slate-400 { color: #a1a1aa !important; }
+        .theme-industrial .preview-box { background-color: #404040 !important; border-color: #a3e635 !important; }
+        .theme-industrial .preview-box p { color: #ffffff !important; }
+        .theme-industrial .restaurant-logo-circle { border-color: #a3e635 !important; }
+        .theme-industrial .restaurant-logo-text-u, .theme-industrial .restaurant-logo-text-mikese { color: #a3e635 !important; }
+        
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #2563eb; cursor: pointer; }
+        input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #2563eb; cursor: pointer; border: none; }
+    </style>
+</head>
+<body class="bg-slate-100 flex h-screen overflow-hidden text-slate-800">
+
+    <div id="left-panel" class="w-1/3 bg-white shadow-xl flex flex-col z-10 border-r border-slate-200">
+        <div class="p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
+            <div>
+                <h1 class="text-2xl font-bold flex items-center gap-2">GastroGEM <span class="bg-blue-600 text-[10px] px-2 py-0.5 rounded-full uppercase">Cloud</span></h1>
+                <p class="text-sm text-slate-400 mt-1">Verze 5.4 (Česká typografie)</p>
+            </div>
+            <div class="flex gap-2">
+                <input type="file" id="logoUpload" accept="image/*" class="hidden">
+                <button id="btnUploadLogo" onclick="document.getElementById('logoUpload').click()" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] uppercase font-bold py-1 px-3 rounded flex items-center gap-1 border border-slate-500 transition-colors">🖼️ Logo</button>
+                <button id="btnClearLogo" onclick="clearLogo()" class="bg-red-900 hover:bg-red-800 text-white text-[10px] uppercase font-bold py-1 px-2 rounded border border-red-700 transition-colors">✖</button>
+            </div>
+        </div>
+
+        <div class="p-5 flex-1 overflow-y-auto">
+            <div class="mb-5 bg-slate-50 p-3 border border-slate-200 rounded-lg shadow-sm">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-sm font-bold text-slate-800">🗓️ Sdílený Plánovač</label>
+                    <button id="btnSavePlan" onclick="saveCurrentMenu()" class="text-xs uppercase bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 font-bold transition-colors shadow">💾 Uložit na tento den</button>
+                </div>
+                <div id="timelineContainer" class="flex gap-2 overflow-x-auto pb-1 hide-scroll snap-x"></div>
+                <div class="flex justify-between items-center mt-2 px-1">
+                    <p class="text-[10px] text-slate-500">Zelená tečka = lístek je v cloudu</p>
+                    <button id="btnClearPlan" onclick="clearCurrentMenu()" class="text-[10px] text-red-500 hover:text-red-700 font-bold">🗑️ Smazat obsah dne</button>
+                </div>
+            </div>
+
+            <div class="mb-5 relative">
+                <label class="block text-sm font-semibold mb-2">Vyhledat nebo upravit jídlo</label>
+                <div class="flex gap-2">
+                    <input type="text" id="searchInput" placeholder="⏳ Načítám tabulky z Googlu..." class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium shadow-sm">
+                    <button onclick="confirmAddMeal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition-colors" title="Přidat na lístek">+</button>
+                </div>
+                <div class="flex items-center gap-2 mt-2 px-1">
+                    <input type="checkbox" id="saveCheckbox" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
+                    <label for="saveCheckbox" class="text-[11px] font-bold text-slate-500 uppercase tracking-tight cursor-pointer">💾 Uložit položku trvale do Excelu</label>
+                </div>
+                <div id="suggestions" class="absolute w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg hidden z-50 max-h-48 overflow-y-auto"></div>
+            </div>
+
+            <div class="mb-5">
+                <label class="block text-sm font-semibold mb-2">Sdělení pro hosty</label>
+                <textarea id="infoMsgTop" rows="2" placeholder="Dnes máme čerstvé ryby..." class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm shadow-sm" oninput="updatePreview()"></textarea>
+            </div>
+
+            <div class="mb-5">
+                <div class="flex justify-between items-center mb-3 border-b pb-2">
+                    <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Vybrané položky:</h3>
+                    <button id="btnSaveTemplate" onclick="saveAsTemplate()" class="text-amber-600 hover:text-amber-700 bg-amber-50 px-2 py-1 rounded text-xs font-bold transition-colors">📌 Uložit Cloud šablonu</button>
+                </div>
+                <ul id="selectedMenuList" class="space-y-3">
+                    <li class="text-sm text-slate-400 italic" id="emptyMenuState">Zatím nic nevybráno. Vyhledejte jídlo výše.</li>
+                </ul>
+                <div id="saveNewMealsContainer" class="mt-4 hidden">
+                    <button id="saveBtn" onclick="saveNewMealsToDatabase()" class="w-full py-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 rounded-lg font-bold flex justify-center items-center gap-2 transition-colors shadow-sm">💾 Uložit nová jídla do Excelu</button>
+                </div>
+            </div>
+            
+            <div class="mb-5">
+                <label class="block text-sm font-semibold mb-2">Vzhled menu pro tisk / sítě</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setTheme('default')" class="py-1.5 px-1 bg-white border-2 border-slate-900 text-slate-900 rounded font-bold text-[10px] hover:bg-slate-100">📄 Klasik</button>
+                    <button onclick="setTheme('dark')" class="py-1.5 px-1 bg-slate-900 border-2 border-slate-900 text-amber-400 rounded font-bold text-[10px] hover:bg-slate-800">🌙 Elegance</button>
+                    <button onclick="setTheme('rustic')" class="py-1.5 px-1 bg-orange-50 border-2 border-amber-700 text-amber-900 rounded font-bold text-[10px] hover:bg-orange-100">🌿 Natura</button>
+                    <button onclick="setTheme('modern')" class="py-1.5 px-1 bg-slate-200 border-2 border-slate-600 text-slate-900 rounded font-bold text-[10px] hover:bg-slate-300">Moderní</button>
+                    <button onclick="setTheme('retro')" class="py-1.5 px-1 bg-rose-50 border-2 border-rose-900 text-rose-900 rounded font-bold text-[10px] hover:bg-rose-100">Retro</button>
+                    <button onclick="setTheme('industrial')" class="py-1.5 px-1 bg-zinc-800 border-2 border-zinc-900 text-lime-400 rounded font-bold text-[10px] hover:bg-zinc-700">Industriál</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-5 bg-slate-50 border-t border-slate-200 flex flex-col gap-3 shrink-0 z-20">
+            <div class="bg-white border border-slate-200 p-3 rounded-lg shadow-sm flex items-center justify-between">
+                <label class="block text-xs font-bold text-slate-700">🔎 Velikost písma</label>
+                <div class="flex items-center gap-3 w-1/2">
+                    <span class="text-xs font-bold text-slate-400">A</span>
+                    <input type="range" min="0.7" max="1.5" step="0.05" value="1.0" oninput="setPrintZoom(this.value)" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                    <span class="text-lg font-bold text-slate-700">A</span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="shareAsImage()" id="btnShareImg" class="py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors shadow-sm flex justify-center items-center gap-1">
+                    🖼️ Sdílet JPG
+                </button>
+                <button onclick="shareAsPDF()" id="btnSharePdf" class="py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-sm transition-colors shadow-sm flex justify-center items-center gap-1">
+                    📄 Sdílet PDF
+                </button>
+                <button onclick="window.print()" class="col-span-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition-colors shadow-sm flex justify-center items-center gap-1">
+                    🖨️ Tisknout / Uložit z PC
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="right-panel" class="w-2/3 bg-slate-200 flex justify-center items-start p-8 overflow-y-auto">
+        <div class="a4-sheet bg-white shadow-2xl relative flex flex-col" id="printArea">
+            <div id="previewHeader" class="text-center mb-6 flex items-center justify-center gap-6 shrink-0"></div>
+            <div id="previewInfoBoxTop" class="hidden preview-box bg-slate-50 p-4 border border-slate-200 rounded-lg text-center mb-4 italic shrink-0">
+                <p class="text-slate-700 text-info-dyn font-medium" id="previewInfoTextTop"></p>
+            </div>
+            <div id="previewMeals" class="flex-1 flex flex-col justify-between pb-4 gap-2"></div>
+            <div class="mt-auto pt-2 border-t border-slate-200 text-center shrink-0">
+                <p class="text-footer-dyn text-slate-400 uppercase tracking-widest font-semibold">Seznam alergenů na vyžádání u obsluhy • Dobrou chuť</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // TVŮJ VLASTNÍ ODKAZ – NEDOTKNOUTO
+        const API_URL = "https://script.google.com/macros/s/AKfycbza-A5MWhmyHaDbTeVKViKWSUTz7y_RdayQokC0VDTZM8u6YDBN-e5iUCmFivjlIreKtw/exec"; 
+        
+        let database = [];
+        let selectedMeals = [];
+        let DYNAMIC_SECTIONS = ['Denní jídla'];
+        let activeDateString = ""; 
+        let serverSettings = {};
+        let serverPlans = {};
+        
+        let tempMealMemory = null;
+
+        function setPrintZoom(val) {
+            document.documentElement.style.setProperty('--font-mult', val);
+        }
+
+        // --- POMOCNÁ FUNKCE PRO ČESKOU TYPOGRAFII ---
+        // Vymění klasickou mezeru za jednopísmenným slovem (s, v, z, k, o, a, i, u...) za nezalomitelnou (non-breaking) mezeru
+        function fixPrepositions(text) {
+            if (!text) return "";
+            // Pro jistotu pouštíme dvakrát za sebou, kdyby byla dvě jednopísmenná slova vedle sebe (např. "a k")
+            return text.replace(/(^|\s)([a-zA-Z])\s+/g, '$1$2\u00A0').replace(/(^|\s)([a-zA-Z])\s+/g, '$1$2\u00A0');
+        }
+
+        async function shareOrDownload(dataUrl, filename, mimeType) {
+            try {
+                const res = await fetch(dataUrl);
+                const blob = await res.blob();
+                const file = new File([blob], filename, { type: mimeType });
+
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Denní menu U Mikeše',
+                        text: 'Dnešní nabídka pro vás!'
+                    });
+                } else {
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = dataUrl;
+                    link.click();
+                }
+            } catch (e) {
+                console.error(e);
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = dataUrl;
+                link.click();
+            }
+        }
+
+        async function shareAsImage() {
+            if (selectedMeals.length === 0) return alert("Lístek je prázdný!");
+            const btn = document.getElementById('btnShareImg');
+            const origText = btn.innerHTML;
+            btn.innerHTML = "⏳ Vytvářím..."; btn.disabled = true;
+
+            const printArea = document.getElementById('printArea');
+            printArea.classList.add('export-mode'); 
+
+            try {
+                const canvas = await html2canvas(printArea, { scale: 2, useCORS: true });
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                let dStr = activeDateString || 'dnes';
+                await shareOrDownload(dataUrl, `menu-${dStr}.jpg`, 'image/jpeg');
+            } catch (e) {
+                alert("Nepodařilo se vytvořit obrázek.");
+            }
+
+            printArea.classList.remove('export-mode');
+            btn.innerHTML = origText; btn.disabled = false;
+        }
+
+        async function shareAsPDF() {
+            if (selectedMeals.length === 0) return alert("Lístek je prázdný!");
+            const btn = document.getElementById('btnSharePdf');
+            const origText = btn.innerHTML;
+            btn.innerHTML = "⏳ Vytvářím..."; btn.disabled = true;
+
+            const printArea = document.getElementById('printArea');
+            printArea.classList.add('export-mode'); 
+
+            let dStr = activeDateString || 'dnes';
+            const filename = `menu-${dStr}.pdf`;
+
+            const opt = {
+                margin: 0,
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            try {
+                const pdfBase64 = await html2pdf().set(opt).from(printArea).outputPdf('datauristring');
+                await shareOrDownload(pdfBase64, filename, 'application/pdf');
+            } catch (e) {
+                alert("Nepodařilo se vytvořit PDF.");
+            }
+
+            printArea.classList.remove('export-mode');
+            btn.innerHTML = origText; btn.disabled = false;
+        }
+
+        document.getElementById('logoUpload').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const btn = document.getElementById('btnUploadLogo');
+            btn.innerHTML = "⏳ Nahrávám...";
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = async function() {
+                    const MAX_SIZE = 300; 
+                    let width = img.width; let height = img.height;
+                    if (width > height && width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } 
+                    else if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const mimeType = file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+                    const dataUrl = canvas.toDataURL(mimeType, 0.8);
+                    
+                    serverSettings['logo'] = dataUrl; 
+                    updatePreview();
+                    
+                    try {
+                        await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveSetting', key: 'logo', value: dataUrl }) });
+                        btn.innerHTML = "✅ Hotovo";
+                    } catch (err) { alert("Chyba cloudu."); btn.innerHTML = "🖼️ Logo"; }
+                    setTimeout(() => btn.innerHTML = "🖼️ Logo", 2000);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+            event.target.value = ''; 
+        });
+
+        async function clearLogo() { 
+            const btn = document.getElementById('btnClearLogo');
+            btn.innerHTML = "⏳";
+            serverSettings['logo'] = ""; 
+            updatePreview();
+            try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveSetting', key: 'logo', value: '' }) }); } catch(e) {}
+            btn.innerHTML = "✖";
+        }
+
+        const getLogoHtml = () => {
+            if (serverSettings['logo']) return `<img src="${serverSettings['logo']}" class="custom-logo" alt="Logo">`;
+            return `<div class="restaurant-logo-circle"><span class="restaurant-logo-text-u">U</span><span class="restaurant-logo-text-mikese">Mikeše</span></div>`;
+        };
+
+        function initTimeline() {
+            if(!activeDateString) {
+                const tmrw = new Date(); tmrw.setDate(tmrw.getDate() + 1);
+                activeDateString = `${tmrw.getFullYear()}-${String(tmrw.getMonth()+1).padStart(2,'0')}-${String(tmrw.getDate()).padStart(2,'0')}`;
+            }
+            selectDate(activeDateString);
+        }
+
+        function generateTimeline() {
+            const container = document.getElementById('timelineContainer');
+            container.innerHTML = '';
+            const today = new Date(); const daysArr = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
+
+            for(let i = -10; i <= 10; i++) {
+                const d = new Date(today); d.setDate(d.getDate() + i);
+                const yyyy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0');
+                const dateStr = `${yyyy}-${mm}-${dd}`;
+                const isSaved = serverPlans[dateStr] ? `<span class="absolute top-1 right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white shadow-sm"></span>` : '';
+                let label = daysArr[d.getDay()]; if(i === 0) label = "Dnes"; else if(i === 1) label = "Zítra";
+
+                const btn = document.createElement('button');
+                const isActive = (dateStr === activeDateString);
+                btn.className = `snap-center relative min-w-[65px] flex flex-col items-center justify-center p-2 rounded border-2 transition-colors focus:outline-none 
+                                 ${isActive ? 'border-blue-600 bg-blue-50 text-blue-900 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-300 text-slate-600'}`;
+                btn.onclick = () => selectDate(dateStr);
+                btn.innerHTML = `${isSaved}<span class="text-[10px] uppercase font-bold mb-0.5 opacity-70">${label}</span><span class="text-sm font-bold">${d.getDate()}.${d.getMonth() + 1}.</span>`;
+                container.appendChild(btn);
+            }
+        }
+
+        function selectDate(dateStr) {
+            activeDateString = dateStr;
+            if(serverPlans[dateStr]) {
+                selectedMeals = JSON.parse(JSON.stringify(serverPlans[dateStr].meals || []));
+                document.getElementById('infoMsgTop').value = serverPlans[dateStr].infoTop || '';
+            } else {
+                let template = JSON.parse(serverSettings['template'] || '[]');
+                selectedMeals = JSON.parse(JSON.stringify(template));
+                document.getElementById('infoMsgTop').value = '';
+            }
+            generateTimeline(); updateUI(); 
+            setTimeout(() => {
+                const activeBtn = document.getElementById('timelineContainer').querySelector('.border-blue-600');
+                if(activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }, 50);
+        }
+
+        async function saveCurrentMenu() {
+            if(selectedMeals.length === 0 && document.getElementById('infoMsgTop').value === '') return alert("Lístek je prázdný.");
+            const btn = document.getElementById('btnSavePlan');
+            btn.innerHTML = "⏳ Ukládám do cloudu...";
+            serverPlans[activeDateString] = { meals: selectedMeals, infoTop: document.getElementById('infoMsgTop').value };
+            generateTimeline();
+            
+            try {
+                await fetch(API_URL, {
+                    method: 'POST', body: JSON.stringify({ action: 'savePlan', date: activeDateString, meals: selectedMeals, infoTop: document.getElementById('infoMsgTop').value })
+                });
+                btn.innerHTML = "✅ Uloženo!"; btn.classList.replace('bg-blue-600', 'bg-emerald-600'); btn.classList.replace('hover:bg-blue-700', 'hover:bg-emerald-700');
+            } catch(e) { btn.innerHTML = "❌ Chyba"; }
+            setTimeout(() => { btn.innerHTML = "💾 Uložit na tento den"; btn.classList.replace('bg-emerald-600', 'bg-blue-600'); btn.classList.replace('hover:bg-emerald-700', 'hover:bg-blue-700'); }, 2000);
+        }
+
+        async function clearCurrentMenu() {
+            if(!confirm('Opravdu chcete tento lístek smazat?')) return;
+            const btn = document.getElementById('btnClearPlan'); btn.innerHTML = "⏳ Mažu...";
+            selectedMeals = []; document.getElementById('infoMsgTop').value = '';
+            if(serverPlans[activeDateString]) delete serverPlans[activeDateString];
+            updateUI(); generateTimeline();
+            try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deletePlan', date: activeDateString }) }); } catch(e) {}
+            btn.innerHTML = "🗑️ Smazat obsah dne";
+        }
+
+        async function saveAsTemplate() {
+            if(!confirm('Chcete uložit tyto položky jako VÝCHOZÍ CLOUD ŠABLONU pro celý tým?')) return;
+            const btn = document.getElementById('btnSaveTemplate'); btn.innerHTML = "⏳ Ukládám šablonu...";
+            const templateStr = JSON.stringify(selectedMeals); serverSettings['template'] = templateStr; 
+            try {
+                await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveSetting', key: 'template', value: templateStr }) });
+                btn.innerHTML = "✅ Šablona v cloudu!";
+            } catch(e) { btn.innerHTML = "❌ Chyba sítě"; }
+            setTimeout(() => btn.innerHTML = "📌 Uložit Cloud šablonu", 2500);
+        }
+
+        function setTheme(theme) {
+            const printArea = document.getElementById('printArea');
+            printArea.classList.remove('theme-dark', 'theme-rustic', 'theme-modern', 'theme-retro', 'theme-industrial');
+            if(theme !== 'default') printArea.classList.add(`theme-${theme}`);
+        }
+
+        async function fetchData() {
+            const inputField = document.getElementById('searchInput');
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                database = data.meals || []; serverSettings = data.settings || {}; serverPlans = data.plans || {};
+                
+                const rawCats = database.map(item => item['Kategorie'] ? String(item['Kategorie']).trim() : '').filter(c => c !== '');
+                const uniqueCats = [...new Set(rawCats)];
+                if(uniqueCats.length > 0) DYNAMIC_SECTIONS = uniqueCats; else DYNAMIC_SECTIONS = ['Polévky', 'Hlavní jídla', 'Dezerty'];
+                
+                inputField.placeholder = "Začněte psát (např. Svíčková)...";
+                initTimeline(); 
+            } catch (error) { inputField.placeholder = "❌ Nelze načíst data z cloudu!"; }
+        }
+
+        const searchInput = document.getElementById('searchInput');
+        const suggestionsBox = document.getElementById('suggestions');
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase(); suggestionsBox.innerHTML = '';
+            if (query.length < 2) { suggestionsBox.classList.add('hidden'); return; }
+            const results = database.filter(item => item['Produkt'] && String(item['Produkt']).toLowerCase().includes(query));
+            suggestionsBox.classList.remove('hidden');
+            if (results.length > 0) {
+                results.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = "p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 flex justify-between text-sm";
+                    div.innerHTML = `<span>${item['Produkt']}</span> <b>${item['Cena'] ? item['Cena'] + ' Kč' : ''}</b>`;
+                    div.onclick = () => {
+                        searchInput.value = item['Produkt'];
+                        tempMealMemory = { ...item };
+                        suggestionsBox.classList.add('hidden');
+                        searchInput.focus();
+                    };
+                    suggestionsBox.appendChild(div);
+                });
+            } else {
+                const div = document.createElement('div');
+                div.className = "p-3 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer font-bold flex items-center gap-2";
+                div.innerHTML = `<span>✨ Připraveno k přidání: "${this.value}"</span>`;
+                div.onclick = () => {
+                    suggestionsBox.classList.add('hidden');
+                    searchInput.focus();
+                };
+                suggestionsBox.appendChild(div);
+            }
+        });
+
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmAddMeal();
+            }
+        });
+
+        function confirmAddMeal() {
+            const val = searchInput.value.trim();
+            if (!val) return;
+
+            const formattedName = val.charAt(0).toUpperCase() + val.slice(1);
+            
+            let cena = (tempMealMemory && tempMealMemory['Cena']) ? tempMealMemory['Cena'] : "";
+            let alergeny = (tempMealMemory && tempMealMemory['Alergeny']) ? tempMealMemory['Alergeny'] : "";
+            let sekce = (tempMealMemory && tempMealMemory['Kategorie']) ? tempMealMemory['Kategorie'] : (DYNAMIC_SECTIONS[0] || 'Denní jídla');
+
+            const checkbox = document.getElementById('saveCheckbox');
+            const wantToSave = checkbox ? checkbox.checked : false;
+
+            const newItem = { 
+                Produkt: formattedName, 
+                Cena: cena, 
+                Alergeny: alergeny, 
+                Sekce: sekce, 
+                isNew: wantToSave 
+            };
+
+            if(!selectedMeals.some(m => m.Produkt === newItem.Produkt)) {
+                selectedMeals.push(newItem); 
+                updateUI();
+            }
+            
+            searchInput.value = ''; 
+            suggestionsBox.classList.add('hidden');
+            tempMealMemory = null;
+            if(checkbox) checkbox.checked = false;
+        }
+
+        function removeMeal(index) { selectedMeals.splice(index, 1); updateUI(); }
+        function updatePrice(index, val) { selectedMeals[index].Cena = val; updatePreview(); }
+        function updateName(index, val) { selectedMeals[index].Produkt = val; updatePreview(); }
+        function updateSection(index, val) { selectedMeals[index].Sekce = val; updatePreview(); }
+
+        function updateUI() {
+            const listObj = document.getElementById('selectedMenuList');
+            const saveContainer = document.getElementById('saveNewMealsContainer');
+            listObj.innerHTML = ''; let hasNewMeals = false;
+            
+            if(selectedMeals.length === 0) {
+                listObj.innerHTML = '<li class="text-sm text-slate-400 italic" id="emptyMenuState">Zatím nic nevybráno. Vyhledejte jídlo výše.</li>';
+            } else {
+                selectedMeals.forEach((meal, index) => {
+                    if(meal.isNew) hasNewMeals = true;
+                    const opts = DYNAMIC_SECTIONS.map(s => `<option value="${s}" ${meal.Sekce === s ? 'selected' : ''}>${s}</option>`).join('');
+                    const badge = meal.isNew ? `<span class="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded uppercase font-bold">Nové</span>` : '';
+                    const li = document.createElement('li');
+                    li.className = "p-2 bg-slate-50 border border-slate-200 rounded-lg shadow-sm space-y-2 cursor-move transition-all hover:border-blue-300 group";
+                    li.draggable = true;
+
+                    li.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', index); setTimeout(() => li.classList.add('opacity-50'), 0); });
+                    li.addEventListener('dragend', () => { li.classList.remove('opacity-50'); });
+                    li.addEventListener('dragover', (e) => { e.preventDefault(); li.classList.add('border-blue-500', 'bg-blue-50'); });
+                    li.addEventListener('dragleave', () => { li.classList.remove('border-blue-500', 'bg-blue-50'); });
+                    li.addEventListener('drop', (e) => {
+                        e.preventDefault(); li.classList.remove('border-blue-500', 'bg-blue-50');
+                        const draggedIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                        if (draggedIdx !== index && !isNaN(draggedIdx)) {
+                            const draggedMeal = selectedMeals.splice(draggedIdx, 1)[0];
+                            selectedMeals.splice(index, 0, draggedMeal); updateUI(); 
+                        }
+                    });
+
+                    li.innerHTML = `
+                        <div class="flex justify-between gap-2 items-center">
+                            <span class="text-slate-400 opacity-50 group-hover:opacity-100 transition-opacity" title="Zatáhnutím nahoru/dolů změníte pořadí">☰</span>
+                            ${badge}
+                            <input type="text" value="${meal.Produkt}" oninput="updateName(${index}, this.value)" class="font-bold text-sm w-full bg-transparent border-b border-transparent focus:border-blue-500 outline-none ${meal.isNew ? 'ml-2' : ''}">
+                            <button onclick="removeMeal(${index})" class="text-red-400 hover:text-red-600 font-bold ml-2">✖</button>
+                        </div>
+                        <div class="flex justify-between items-center pl-6">
+                            <select onchange="updateSection(${index}, this.value)" class="text-[10px] uppercase font-bold p-1 border rounded bg-white">${opts}</select>
+                            <div class="flex items-center gap-1">
+                                <input type="number" value="${meal.Cena}" oninput="updatePrice(${index}, this.value)" class="w-14 p-1 border rounded text-right text-sm font-bold" placeholder="0">
+                                <span class="text-xs font-bold">Kč</span>
+                            </div>
+                        </div>
+                    `;
+                    listObj.appendChild(li);
+                });
+            }
+            if(hasNewMeals) {
+                saveContainer.classList.remove('hidden'); document.getElementById('saveBtn').innerHTML = "💾 Uložit nová jídla do Excelu"; document.getElementById('saveBtn').disabled = false;
+            } else { saveContainer.classList.add('hidden'); }
+            updatePreview();
+        }
+
+        async function saveNewMealsToDatabase() {
+            const newMeals = selectedMeals.filter(m => m.isNew); if(newMeals.length === 0) return;
+            const btn = document.getElementById('saveBtn'); btn.innerHTML = "⏳ Ukládám do Excelu..."; btn.disabled = true;
+            const payload = newMeals.map(m => ({ Produkt: m.Produkt, Cena: m.Cena || "0", Alergeny: "", Kategorie: m.Sekce }));
+            try {
+                await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addMeals', data: payload }) });
+                selectedMeals.forEach(m => { if(m.isNew) m.isNew = false; }); payload.forEach(p => database.push(p));
+                btn.innerHTML = "✅ Uloženo!";
+                const rawCats = database.map(item => item['Kategorie'] ? String(item['Kategorie']).trim() : '').filter(c => c !== ''); DYNAMIC_SECTIONS = [...new Set(rawCats)];
+                setTimeout(() => { updateUI(); }, 2000); 
+            } catch (error) { btn.innerHTML = "❌ Chyba ukládání!"; btn.disabled = false; }
+        }
+
+        function updatePreview() {
+            const headerObj = document.getElementById('previewHeader'); 
+            const infoBoxTop = document.getElementById('previewInfoBoxTop'); 
+            const infoInputTop = document.getElementById('infoMsgTop').value;
+            
+            // APLIKOVÁNA TYPOGRAFIE NA SDĚLENÍ PRO HOSTY
+            if(infoInputTop.trim() !== '') { 
+                document.getElementById('previewInfoTextTop').textContent = fixPrepositions(infoInputTop); 
+                infoBoxTop.classList.remove('hidden');
+            } else { 
+                infoBoxTop.classList.add('hidden'); 
+            }
+            
+            let dStr = ""; if(activeDateString) { const parts = activeDateString.split('-'); dStr = `${parseInt(parts[2])}. ${parseInt(parts[1])}. ${parts[0]}`; }
+            const logoHtml = getLogoHtml();
+            
+            headerObj.innerHTML = `
+                ${logoHtml}
+                <div class="flex-1">
+                    <h1 class="text-title-dyn font-serif font-bold text-slate-900 mb-2 tracking-tight italic">Denní menu</h1>
+                    <div class="flex justify-center items-center gap-4">
+                        <div class="h-[1px] bg-slate-300 w-12"></div><p class="text-date-dyn font-bold text-slate-600">${dStr}</p><div class="h-[1px] bg-slate-300 w-12"></div>
+                    </div>
+                </div>
+                ${logoHtml}
+            `;
+            const previewObj = document.getElementById('previewMeals'); previewObj.innerHTML = '';
+            DYNAMIC_SECTIONS.forEach(sName => {
+                const meals = selectedMeals.filter(m => m.Sekce === sName);
+                if(meals.length > 0) {
+                    const sectionDiv = document.createElement('div'); const h = document.createElement('div'); h.className = "section-line";
+                    h.innerHTML = `<h3 class="text-section-dyn font-serif font-bold text-slate-800 uppercase tracking-widest italic">${sName}</h3>`; sectionDiv.appendChild(h);
+                    meals.forEach(m => {
+                        const row = document.createElement('div'); row.className = "flex justify-between items-baseline mb-1";
+                        const alg = m.Alergeny ? `<span class="text-alg-dyn text-slate-400 ml-2 font-sans font-normal italic">(${m.Alergeny})</span>` : '';
+                        
+                        // APLIKOVÁNA TYPOGRAFIE NA NÁZEV JÍDLA
+                        const fixedMealName = fixPrepositions(m.Produkt);
+                        
+                        row.innerHTML = `
+                            <div class="text-meal-dyn font-semibold font-sans text-slate-800 leading-tight w-4/5">${fixedMealName}${alg}</div>
+                            <div class="text-meal-dyn font-bold font-sans text-slate-900 border-b border-dotted border-slate-300 flex-1 mx-3 h-1 relative -top-1"></div>
+                            <div class="text-price-dyn font-bold font-sans text-slate-900 whitespace-nowrap">${m.Cena || '-'} Kč</div>
+                        `;
+                        sectionDiv.appendChild(row);
+                    });
+                    previewObj.appendChild(sectionDiv);
+                }
+            });
+        }
+
+        window.addEventListener('load', () => { fetchData(); });
+    </script>
+</body>
+</html>
