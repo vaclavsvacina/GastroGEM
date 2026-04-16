@@ -114,7 +114,7 @@
         <div class="p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
             <div>
                 <h1 class="text-2xl font-bold flex items-center gap-2">GastroGEM <span class="bg-blue-600 text-[10px] px-2 py-0.5 rounded-full uppercase">Cloud</span></h1>
-                <p class="text-sm text-slate-400 mt-1">Verze 4.7 (Profi Typografie)</p>
+                <p class="text-sm text-slate-400 mt-1">Verze 5.4 (Česká typografie)</p>
             </div>
             <div class="flex gap-2">
                 <input type="file" id="logoUpload" accept="image/*" class="hidden">
@@ -137,8 +137,15 @@
             </div>
 
             <div class="mb-5 relative">
-                <label class="block text-sm font-semibold mb-2">Přidat jídlo</label>
-                <input type="text" id="searchInput" placeholder="⏳ Načítám tabulky z Googlu..." class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium shadow-sm">
+                <label class="block text-sm font-semibold mb-2">Vyhledat nebo upravit jídlo</label>
+                <div class="flex gap-2">
+                    <input type="text" id="searchInput" placeholder="⏳ Načítám tabulky z Googlu..." class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium shadow-sm">
+                    <button onclick="confirmAddMeal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition-colors" title="Přidat na lístek">+</button>
+                </div>
+                <div class="flex items-center gap-2 mt-2 px-1">
+                    <input type="checkbox" id="saveCheckbox" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
+                    <label for="saveCheckbox" class="text-[11px] font-bold text-slate-500 uppercase tracking-tight cursor-pointer">💾 Uložit položku trvale do Excelu</label>
+                </div>
                 <div id="suggestions" class="absolute w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg hidden z-50 max-h-48 overflow-y-auto"></div>
             </div>
 
@@ -211,9 +218,7 @@
     </div>
 
     <script>
-        // ==========================================
-        // ⚠️ VLOŽ SEM SVOJI PŮVODNÍ GOOGLE ADRESU ⚠️
-        // ==========================================
+        // TVŮJ VLASTNÍ ODKAZ – NEDOTKNOUTO
         const API_URL = "https://script.google.com/macros/s/AKfycbza-A5MWhmyHaDbTeVKViKWSUTz7y_RdayQokC0VDTZM8u6YDBN-e5iUCmFivjlIreKtw/exec"; 
         
         let database = [];
@@ -223,8 +228,18 @@
         let serverSettings = {};
         let serverPlans = {};
         
+        let tempMealMemory = null;
+
         function setPrintZoom(val) {
             document.documentElement.style.setProperty('--font-mult', val);
+        }
+
+        // --- POMOCNÁ FUNKCE PRO ČESKOU TYPOGRAFII ---
+        // Vymění klasickou mezeru za jednopísmenným slovem (s, v, z, k, o, a, i, u...) za nezalomitelnou (non-breaking) mezeru
+        function fixPrepositions(text) {
+            if (!text) return "";
+            // Pro jistotu pouštíme dvakrát za sebou, kdyby byla dvě jednopísmenná slova vedle sebe (např. "a k")
+            return text.replace(/(^|\s)([a-zA-Z])\s+/g, '$1$2\u00A0').replace(/(^|\s)([a-zA-Z])\s+/g, '$1$2\u00A0');
         }
 
         async function shareOrDownload(dataUrl, filename, mimeType) {
@@ -476,34 +491,63 @@
                     const div = document.createElement('div');
                     div.className = "p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 flex justify-between text-sm";
                     div.innerHTML = `<span>${item['Produkt']}</span> <b>${item['Cena'] ? item['Cena'] + ' Kč' : ''}</b>`;
-                    div.onclick = () => addMeal(item); suggestionsBox.appendChild(div);
+                    div.onclick = () => {
+                        searchInput.value = item['Produkt'];
+                        tempMealMemory = { ...item };
+                        suggestionsBox.classList.add('hidden');
+                        searchInput.focus();
+                    };
+                    suggestionsBox.appendChild(div);
                 });
             } else {
                 const div = document.createElement('div');
                 div.className = "p-3 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer font-bold flex items-center gap-2";
-                div.innerHTML = `<span>✨ Vytvořit novinku: "${this.value}"</span>`;
-                div.onclick = () => createNewMeal(this.value); suggestionsBox.appendChild(div);
+                div.innerHTML = `<span>✨ Připraveno k přidání: "${this.value}"</span>`;
+                div.onclick = () => {
+                    suggestionsBox.classList.add('hidden');
+                    searchInput.focus();
+                };
+                suggestionsBox.appendChild(div);
             }
         });
 
-        function createNewMeal(name) {
-            const formattedName = name.charAt(0).toUpperCase() + name.slice(1);
-            const defaultCat = DYNAMIC_SECTIONS.length > 0 ? DYNAMIC_SECTIONS[0] : 'Denní jídla';
-            const newItem = { Produkt: formattedName, Cena: "", Alergeny: "", Kategorie: defaultCat, isNew: true };
-            addMeal(newItem);
-        }
-
-        function addMeal(item) {
-            if(!selectedMeals.some(m => m.Produkt === item.Produkt)) {
-                let defaultSection = DYNAMIC_SECTIONS[0]; 
-                if (item['Kategorie']) {
-                    const catToFind = String(item['Kategorie']).trim().toLowerCase();
-                    const found = DYNAMIC_SECTIONS.find(s => s.toLowerCase() === catToFind);
-                    if (found) defaultSection = found;
-                }
-                selectedMeals.push({...item, Sekce: defaultSection}); updateUI();
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmAddMeal();
             }
-            searchInput.value = ''; suggestionsBox.classList.add('hidden');
+        });
+
+        function confirmAddMeal() {
+            const val = searchInput.value.trim();
+            if (!val) return;
+
+            const formattedName = val.charAt(0).toUpperCase() + val.slice(1);
+            
+            let cena = (tempMealMemory && tempMealMemory['Cena']) ? tempMealMemory['Cena'] : "";
+            let alergeny = (tempMealMemory && tempMealMemory['Alergeny']) ? tempMealMemory['Alergeny'] : "";
+            let sekce = (tempMealMemory && tempMealMemory['Kategorie']) ? tempMealMemory['Kategorie'] : (DYNAMIC_SECTIONS[0] || 'Denní jídla');
+
+            const checkbox = document.getElementById('saveCheckbox');
+            const wantToSave = checkbox ? checkbox.checked : false;
+
+            const newItem = { 
+                Produkt: formattedName, 
+                Cena: cena, 
+                Alergeny: alergeny, 
+                Sekce: sekce, 
+                isNew: wantToSave 
+            };
+
+            if(!selectedMeals.some(m => m.Produkt === newItem.Produkt)) {
+                selectedMeals.push(newItem); 
+                updateUI();
+            }
+            
+            searchInput.value = ''; 
+            suggestionsBox.classList.add('hidden');
+            tempMealMemory = null;
+            if(checkbox) checkbox.checked = false;
         }
 
         function removeMeal(index) { selectedMeals.splice(index, 1); updateUI(); }
@@ -513,14 +557,12 @@
 
         function updateUI() {
             const listObj = document.getElementById('selectedMenuList');
-            const emptyState = document.getElementById('emptyMenuState');
             const saveContainer = document.getElementById('saveNewMealsContainer');
             listObj.innerHTML = ''; let hasNewMeals = false;
             
             if(selectedMeals.length === 0) {
-                listObj.appendChild(emptyState); emptyState.style.display = 'block';
+                listObj.innerHTML = '<li class="text-sm text-slate-400 italic" id="emptyMenuState">Zatím nic nevybráno. Vyhledejte jídlo výše.</li>';
             } else {
-                if(emptyState) emptyState.style.display = 'none';
                 selectedMeals.forEach((meal, index) => {
                     if(meal.isNew) hasNewMeals = true;
                     const opts = DYNAMIC_SECTIONS.map(s => `<option value="${s}" ${meal.Sekce === s ? 'selected' : ''}>${s}</option>`).join('');
@@ -580,9 +622,18 @@
         }
 
         function updatePreview() {
-            const headerObj = document.getElementById('previewHeader'); const infoBoxTop = document.getElementById('previewInfoBoxTop'); const infoInputTop = document.getElementById('infoMsgTop').value;
-            if(infoInputTop.trim() !== '') { document.getElementById('previewInfoTextTop').textContent = infoInputTop; infoBoxTop.classList.remove('hidden');
-            } else { infoBoxTop.classList.add('hidden'); }
+            const headerObj = document.getElementById('previewHeader'); 
+            const infoBoxTop = document.getElementById('previewInfoBoxTop'); 
+            const infoInputTop = document.getElementById('infoMsgTop').value;
+            
+            // APLIKOVÁNA TYPOGRAFIE NA SDĚLENÍ PRO HOSTY
+            if(infoInputTop.trim() !== '') { 
+                document.getElementById('previewInfoTextTop').textContent = fixPrepositions(infoInputTop); 
+                infoBoxTop.classList.remove('hidden');
+            } else { 
+                infoBoxTop.classList.add('hidden'); 
+            }
+            
             let dStr = ""; if(activeDateString) { const parts = activeDateString.split('-'); dStr = `${parseInt(parts[2])}. ${parseInt(parts[1])}. ${parts[0]}`; }
             const logoHtml = getLogoHtml();
             
@@ -606,9 +657,11 @@
                         const row = document.createElement('div'); row.className = "flex justify-between items-baseline mb-1";
                         const alg = m.Alergeny ? `<span class="text-alg-dyn text-slate-400 ml-2 font-sans font-normal italic">(${m.Alergeny})</span>` : '';
                         
-                        // ZDE SE ZMĚNIL FONT NA FONT-SANS (MONTSERRAT) PRO MAXIMÁLNÍ ČITELNOST
+                        // APLIKOVÁNA TYPOGRAFIE NA NÁZEV JÍDLA
+                        const fixedMealName = fixPrepositions(m.Produkt);
+                        
                         row.innerHTML = `
-                            <div class="text-meal-dyn font-semibold font-sans text-slate-800 leading-tight w-4/5">${m.Produkt}${alg}</div>
+                            <div class="text-meal-dyn font-semibold font-sans text-slate-800 leading-tight w-4/5">${fixedMealName}${alg}</div>
                             <div class="text-meal-dyn font-bold font-sans text-slate-900 border-b border-dotted border-slate-300 flex-1 mx-3 h-1 relative -top-1"></div>
                             <div class="text-price-dyn font-bold font-sans text-slate-900 whitespace-nowrap">${m.Cena || '-'} Kč</div>
                         `;
